@@ -173,18 +173,18 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <p>在写文档的时候，研究了一下micrometer自带的java相关的指标是怎么产生的，首先找到MeterBinder接口，所有的自带Metric指标都跟这个接口有关系</p>
+        <p>在写文档的时候，研究了一下<code>micrometer</code>自带的<code>java</code>相关的指标是怎么产生的，首先找到<code>MeterBinder</code>接口，所有的自带<code>Metric</code>指标都跟这个接口有关系</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">/**</span><br><span class="line"> * Binders register one or more metrics to provide information about the state of some</span><br><span class="line"> * aspect of the application or its container.</span><br><span class="line"> * &lt;p&gt;</span><br><span class="line"> * Binders are enabled by default if they source data for an alert that is recommended for</span><br><span class="line"> * a production ready app.</span><br><span class="line"> */</span><br><span class="line">public interface MeterBinder &#123;</span><br><span class="line">    //用于将不同的Metric指标注册到registry</span><br><span class="line">    void bindTo(@NonNull MeterRegistry registry);</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>拿一个比较简单的Metric举例</p>
+<p>拿一个比较简单的<code>Metric</code>举例</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">public class JvmInfoMetrics implements MeterBinder &#123;</span><br><span class="line"></span><br><span class="line">    @Override</span><br><span class="line">    public void bindTo(MeterRegistry registry) &#123;</span><br><span class="line">        Gauge.builder(&quot;jvm.info&quot;, () -&gt; 1L).description(&quot;JVM version info&quot;)</span><br><span class="line">                .tags(&quot;version&quot;, System.getProperty(&quot;java.runtime.version&quot;, &quot;unknown&quot;), &quot;vendor&quot;,</span><br><span class="line">                        System.getProperty(&quot;java.vm.vendor&quot;, &quot;unknown&quot;), &quot;runtime&quot;,</span><br><span class="line">                        System.getProperty(&quot;java.runtime.name&quot;, &quot;unknown&quot;))</span><br><span class="line">                .strongReference(true).register(registry);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>可以看到，JvmInfoMetrics通过调用System.getProperty()方法来获取了几个jvm相关的参数。而这个方法是在CompositeMeterRegistryConfigurer类中被调用的，具体方法如下</p>
+<p>可以看到，<code>JvmInfoMetrics</code>通过调用<code>System.getProperty()</code>方法来获取了几个<code>jvm</code>相关的参数。而这个方法是在<code>CompositeMeterRegistryConfigurer</code>类中被调用的，具体方法如下</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">private void addBinders(@NonNull CompositeMeterRegistry meterRegistry) &#123;</span><br><span class="line">    if (binders != null &amp;&amp; !binders.isEmpty()) &#123;</span><br><span class="line">        for (MeterBinder binder : binders) &#123;</span><br><span class="line">            binder.bindTo(meterRegistry);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>从代码中可以看出，CompositeMeterRegistryConfigurer类会将注入的所有binder，调用该binder的自定义bindTo()方法，注册到传入的meterRegistry中。</p>
-<p>而这个addBinders方法会在类中的configure方法中调用</p>
+<p>从代码中可以看出，<code>CompositeMeterRegistryConfigurer</code>类会将注入的所有<code>binder</code>，调用该<code>binder</code>的自定义<code>bindTo()</code>方法，注册到传入的<code>meterRegistry</code>中。</p>
+<p>而这个<code>addBinders</code>方法会在类中的<code>configure</code>方法中调用</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void configure(@NonNull CompositeMeterRegistry meterRegistry) &#123;</span><br><span class="line">    addFilters(meterRegistry);</span><br><span class="line">    addBinders(meterRegistry);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>最终，这个方法又会回到MeterRegistryFactory工厂类中。</p>
+<p>最终，这个方法又会回到<code>MeterRegistryFactory</code>工厂类中。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">@Primary</span><br><span class="line">@Singleton</span><br><span class="line">@Bean(preDestroy = &quot;close&quot;)</span><br><span class="line">CompositeMeterRegistry compositeMeterRegistry(List&lt;MeterRegistry&gt; registries,</span><br><span class="line">                                              List&lt;MeterRegistryConfigurer&lt;MeterRegistry&gt;&gt; configurers) &#123;</span><br><span class="line">    if (CollectionUtils.isEmpty(registries)) &#123;</span><br><span class="line">        registries.add(new SimpleMeterRegistry());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    CompositeMeterRegistry compositeMeterRegistry = new CompositeMeterRegistry();</span><br><span class="line">    for (MeterRegistry registry : registries) &#123;</span><br><span class="line">        compositeMeterRegistry.add(registry);</span><br><span class="line">        for (MeterRegistryConfigurer&lt;MeterRegistry&gt; configurer : configurers) &#123;</span><br><span class="line">            // Let configurers configure the composite registry</span><br><span class="line">            if (configurer.getType().isAssignableFrom(CompositeMeterRegistry.class) &amp;&amp; configurer.supports(compositeMeterRegistry)) &#123;</span><br><span class="line">                configurer.configure(compositeMeterRegistry);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            //Let configurers configure individual registries</span><br><span class="line">            if (configurer.getType().isAssignableFrom(registry.getClass()) &amp;&amp; configurer.supports(registry)) &#123;</span><br><span class="line">                configurer.configure(registry);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return compositeMeterRegistry;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>工厂类会自动创建单例的CompositeMeterRegistry，创建的时候，会调用configurer.configure(compositeMeterRegistry)或configurer.configure(registry)方法，将binder注册到registry中。</p>
+<p>工厂类会自动创建单例的<code>CompositeMeterRegistry</code>，创建的时候，会调用<code>configurer.configure(compositeMeterRegistry)</code>或<code>configurer.configure(registry)</code>方法，将<code>binder</code>注册到<code>registry</code>中。</p>
 
       
 
@@ -424,15 +424,15 @@
         		</li>
       		 
         		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">ElasticMeterRegistry</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
         			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">micronaut</a>
         		</li>
       		 
         		<li class="article-tag-list-item">
         			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">micronaut-micrometer</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">ElasticMeterRegistry</a>
         		</li>
       		
 		</ul>
@@ -682,7 +682,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
              
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color1">ElasticMeterRegistry</a>
+                <a href="javascript:void(0)" class="js-tag color3">_source</a>
               </li>
              
               <li class="article-tag-list-item">
@@ -694,7 +694,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
              
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color3">_source</a>
+                <a href="javascript:void(0)" class="js-tag color1">ElasticMeterRegistry</a>
               </li>
              
               <li class="article-tag-list-item">
