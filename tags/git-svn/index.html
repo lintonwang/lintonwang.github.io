@@ -6,11 +6,11 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="https://github.com/lintonwang">
-  <title>Linton&#39;s blog</title>
+  <title>Tag: git-svn | Linton&#39;s blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta property="og:type" content="website">
 <meta property="og:title" content="Linton&#39;s blog">
-<meta property="og:url" content="https://github.com/lintonwang/index.html">
+<meta property="og:url" content="https://github.com/lintonwang/tags/git-svn/index.html">
 <meta property="og:site_name" content="Linton&#39;s blog">
 <meta property="og:locale" content="en_US">
 <meta property="article:author" content="Linton">
@@ -153,143 +153,34 @@
           <div id="js-content" class="content-ll">
             
   
-    <article id="post-mircrometer-metrics源码" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/lintonwang/2022/08/12/mircrometer-metrics%E6%BA%90%E7%A0%81/">mircrometer-metrics源码</a>
-    </h1>
-  
-
-        
-        <a href="/lintonwang/2022/08/12/mircrometer-metrics%E6%BA%90%E7%A0%81/" class="archive-article-date">
-  	<time datetime="2022-08-12T06:33:16.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-12</time>
-</a>
-        
-      </header>
     
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>在写文档的时候，研究了一下micrometer自带的java相关的指标是怎么产生的，首先找到MeterBinder接口，所有的自带Metric指标都跟这个接口有关系</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">/**</span><br><span class="line"> * Binders register one or more metrics to provide information about the state of some</span><br><span class="line"> * aspect of the application or its container.</span><br><span class="line"> * &lt;p&gt;</span><br><span class="line"> * Binders are enabled by default if they source data for an alert that is recommended for</span><br><span class="line"> * a production ready app.</span><br><span class="line"> */</span><br><span class="line">public interface MeterBinder &#123;</span><br><span class="line">    //用于将不同的Metric指标注册到registry</span><br><span class="line">    void bindTo(@NonNull MeterRegistry registry);</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>拿一个比较简单的Metric举例</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">public class JvmInfoMetrics implements MeterBinder &#123;</span><br><span class="line"></span><br><span class="line">    @Override</span><br><span class="line">    public void bindTo(MeterRegistry registry) &#123;</span><br><span class="line">        Gauge.builder(&quot;jvm.info&quot;, () -&gt; 1L).description(&quot;JVM version info&quot;)</span><br><span class="line">                .tags(&quot;version&quot;, System.getProperty(&quot;java.runtime.version&quot;, &quot;unknown&quot;), &quot;vendor&quot;,</span><br><span class="line">                        System.getProperty(&quot;java.vm.vendor&quot;, &quot;unknown&quot;), &quot;runtime&quot;,</span><br><span class="line">                        System.getProperty(&quot;java.runtime.name&quot;, &quot;unknown&quot;))</span><br><span class="line">                .strongReference(true).register(registry);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>可以看到，JvmInfoMetrics通过调用System.getProperty()方法来获取了几个jvm相关的参数。而这个方法是在CompositeMeterRegistryConfigurer类中被调用的，具体方法如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">private void addBinders(@NonNull CompositeMeterRegistry meterRegistry) &#123;</span><br><span class="line">    if (binders != null &amp;&amp; !binders.isEmpty()) &#123;</span><br><span class="line">        for (MeterBinder binder : binders) &#123;</span><br><span class="line">            binder.bindTo(meterRegistry);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>从代码中可以看出，CompositeMeterRegistryConfigurer类会将注入的所有binder，调用该binder的自定义bindTo()方法，注册到传入的meterRegistry中。</p>
-<p>而这个addBinders方法会在类中的configure方法中调用</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void configure(@NonNull CompositeMeterRegistry meterRegistry) &#123;</span><br><span class="line">    addFilters(meterRegistry);</span><br><span class="line">    addBinders(meterRegistry);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>最终，这个方法又会回到MeterRegistryFactory工厂类中。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">@Primary</span><br><span class="line">@Singleton</span><br><span class="line">@Bean(preDestroy = &quot;close&quot;)</span><br><span class="line">CompositeMeterRegistry compositeMeterRegistry(List&lt;MeterRegistry&gt; registries,</span><br><span class="line">                                              List&lt;MeterRegistryConfigurer&lt;MeterRegistry&gt;&gt; configurers) &#123;</span><br><span class="line">    if (CollectionUtils.isEmpty(registries)) &#123;</span><br><span class="line">        registries.add(new SimpleMeterRegistry());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    CompositeMeterRegistry compositeMeterRegistry = new CompositeMeterRegistry();</span><br><span class="line">    for (MeterRegistry registry : registries) &#123;</span><br><span class="line">        compositeMeterRegistry.add(registry);</span><br><span class="line">        for (MeterRegistryConfigurer&lt;MeterRegistry&gt; configurer : configurers) &#123;</span><br><span class="line">            // Let configurers configure the composite registry</span><br><span class="line">            if (configurer.getType().isAssignableFrom(CompositeMeterRegistry.class) &amp;&amp; configurer.supports(compositeMeterRegistry)) &#123;</span><br><span class="line">                configurer.configure(compositeMeterRegistry);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            //Let configurers configure individual registries</span><br><span class="line">            if (configurer.getType().isAssignableFrom(registry.getClass()) &amp;&amp; configurer.supports(registry)) &#123;</span><br><span class="line">                configurer.configure(registry);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return compositeMeterRegistry;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>工厂类会自动创建单例的CompositeMeterRegistry，创建的时候，会调用configurer.configure(compositeMeterRegistry)或configurer.configure(registry)方法，将binder注册到registry中。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
+    
       
       
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">micronaut</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">micronaut-micrometer</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="/lintonwang/categories/micrometer//" class="article-tag-list-link color1">micrometer</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/lintonwang/2022/08/12/mircrometer-metrics%E6%BA%90%E7%A0%81/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
+      <section class="archives-wrap">
+        <div class="archive-year-wrap">
+          <a href="/lintonwang/archives/2022" class="archive-year">2022</a>
         </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-git svn command return error128" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
+        <div class="archives">
     
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/lintonwang/2022/08/12/git%20svn%20command%20return%20error128/">git-svn command return error:128</a>
-    </h1>
-  
-
-        
-        <a href="/lintonwang/2022/08/12/git%20svn%20command%20return%20error128/" class="archive-article-date">
+    <article class="archive-article archive-type-post">
+  <div class="archive-article-inner">
+    <header class="archive-article-header">
+      	<div class="article-meta">
+	      	<a href="/lintonwang/2022/08/12/git%20svn%20command%20return%20error128/" class="archive-article-date">
   	<time datetime="2022-08-12T06:22:11.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-12</time>
 </a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>在使用<code>git-svn</code>将<code>svn</code>代码<code>clone</code>出来时，执行代码</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git svn clone http://svn/trunk</span><br></pre></td></tr></table></figure>
-<p>执行过程中无报错，但然后执行</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git svn rebase</span><br></pre></td></tr></table></figure>
-<p>提示报错</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">fatal:bad revision &#x27;HEAD&#x27;</span><br><span class="line">rev-list --first-parent --pretty=medium HEAD --; command returned error: 128</span><br></pre></td></tr></table></figure>
-<p>后面研究了半天，发现是因为当前所处目录层级不对导致的，需要进入到<code>clone</code>出来的代码目录下，执行命令</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">cd trunk</span><br><span class="line"></span><br><span class="line">git svn rebase</span><br></pre></td></tr></table></figure>
-<p>然后没有报错了</p>
+        </div>
+    	 
+  
+    <h1 itemprop="name">
+      <a class="archive-article-title" href="/lintonwang/2022/08/12/git%20svn%20command%20return%20error128/">git-svn command return error:128</a>
+    </h1>
+  
 
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
+        <div class="article-info info-on-right">
+          
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
@@ -305,7 +196,7 @@
 		</ul>
 	</div>
 
-      
+          
 	<div class="article-category tagcloud">
 		<i class="icon-book icon"></i>
 		<ul class="article-tag-list">
@@ -318,274 +209,17 @@
 	</div>
 
 
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/lintonwang/2022/08/12/git%20svn%20command%20return%20error128/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
+        </div>
+        <div class="clearfix"></div>
+    </header>
   </div>
 </article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
   
-    <article id="post-ElasticMeterRegistry执行流程" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
+  
+    </div></section>
+  
+
     
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/lintonwang/2022/08/08/ElasticMeterRegistry%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B/">ElasticMeterRegistry code analysis</a>
-    </h1>
-  
-
-        
-        <a href="/lintonwang/2022/08/08/ElasticMeterRegistry%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B/" class="archive-article-date">
-  	<time datetime="2022-08-08T09:49:12.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-08</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">protected ElasticMeterRegistry(ElasticConfig config, Clock clock, ThreadFactory threadFactory,</span><br><span class="line">        HttpSender httpClient) &#123;</span><br><span class="line">    super(config, clock);</span><br><span class="line">    config().namingConvention(new ElasticNamingConvention());</span><br><span class="line">    this.config = config;</span><br><span class="line">    indexDateFormatter = DateTimeFormatter.ofPattern(config.indexDateFormat());</span><br><span class="line">    this.httpClient = httpClient;</span><br><span class="line">    if (StringUtils.isNotEmpty(config.pipeline())) &#123;</span><br><span class="line">        actionLine = &quot;&#123; \&quot;create\&quot; : &#123;\&quot;pipeline\&quot;:\&quot;&quot; + config.pipeline() + &quot;\&quot;&#125; &#125;\n&quot;;</span><br><span class="line">    &#125;</span><br><span class="line">    else &#123;</span><br><span class="line">        actionLine = &quot;&#123; \&quot;create\&quot; : &#123;&#125; &#125;\n&quot;;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    start(threadFactory);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>从创建<code>ElasticMeterRegistry</code>类开始，在代码最后执行了<code>start(threadFactory)</code>方法。由于<code>ElasticMeterRegistry</code>类没有重写<code>start(threadFactory)</code>方法，所以实际上是调用的父类的<code>start(threadFactory)</code>方法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">public class ElasticMeterRegistry extends StepMeterRegistry&#123;&#125;</span><br></pre></td></tr></table></figure>
-<p>可以看出<code>ElasticMeterRegistry</code>类的上一级父类是<code>StepMeterRegistry</code>类。进入到父类的<code>start(threadFactory)</code>方法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">public void start(ThreadFactory threadFactory) &#123;</span><br><span class="line">    if (scheduledExecutorService != null)</span><br><span class="line">        stop();</span><br><span class="line"></span><br><span class="line">    if (config.enabled()) &#123;</span><br><span class="line">        logger.info(&quot;publishing metrics for &quot; + this.getClass().getSimpleName() + &quot; every &quot;</span><br><span class="line">                + TimeUtils.format(config.step()));</span><br><span class="line"></span><br><span class="line">        scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(threadFactory);</span><br><span class="line">        // time publication to happen just after StepValue finishes the step</span><br><span class="line">        long stepMillis = config.step().toMillis();</span><br><span class="line">        long initialDelayMillis = stepMillis - (clock.wallTime() % stepMillis) + 1;</span><br><span class="line">        scheduledExecutorService.scheduleAtFixedRate(this::publishSafely, initialDelayMillis, stepMillis,</span><br><span class="line">                TimeUnit.MILLISECONDS);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>在这里最后，<code>StepMeterRegistry</code>类通过创建单线程Delay线程池，通过函数式传入了<code>publishSafely</code>方法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">public ScheduledFuture&lt;?&gt; scheduleAtFixedRate(Runnable command,</span><br><span class="line">                                              long initialDelay,</span><br><span class="line">                                              long period,</span><br><span class="line">                                              TimeUnit unit);</span><br></pre></td></tr></table></figure>
-<p><code>scheduleAtFixedRate</code>方法会生成一个周期性任务，在<code>initialDelay</code>时间后，每隔<code>initialDelay</code>时间去执行一次<code>command</code>操作，而我们传入的<code>command</code>操作就是<code>StepMeterRegistry</code>类的<code>publishSafely</code>方法。</p>
-<blockquote>
-<p>注意：当command的执行时间超过period时间的时候，会等待command执行完才会去执行下一个command。</p>
-</blockquote>
-<p>回归正文，来看<code>publishSafely</code>方法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">private void publishSafely() &#123;</span><br><span class="line">    try &#123;</span><br><span class="line">        publish();</span><br><span class="line">    &#125;</span><br><span class="line">    catch (Throwable e) &#123;</span><br><span class="line">        logger.warn(&quot;Unexpected exception thrown while publishing metrics for &quot; + this.getClass().getSimpleName(),</span><br><span class="line">                e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>可以看到<code>publishSafely</code>方法会直接调用<code>publish()</code>方法，只是包装了一层异常处理。而这时候因为<code>ElasticMeterRegistry</code>类重写了<code>publish()</code>方法,所以又回到了<code>ElasticMeterRegistry</code>类的<code>publish()</code>方法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">protected void publish() &#123;</span><br><span class="line">    createIndexTemplateIfNeeded();</span><br><span class="line"></span><br><span class="line">    String uri = config.host() + &quot;/&quot; + indexName() + &quot;/_bulk&quot;;</span><br><span class="line">    for (List&lt;Meter&gt; batch : MeterPartition.partition(this, config.batchSize())) &#123;</span><br><span class="line">        try &#123;</span><br><span class="line">            String requestBody = batch.stream()</span><br><span class="line">                    .map(m -&gt; m.match(this::writeGauge, this::writeCounter, this::writeTimer, this::writeSummary,</span><br><span class="line">                            this::writeLongTaskTimer, this::writeTimeGauge, this::writeFunctionCounter,</span><br><span class="line">                            this::writeFunctionTimer, this::writeMeter))</span><br><span class="line">                    .filter(Optional::isPresent).map(Optional::get).collect(joining(&quot;\n&quot;, &quot;&quot;, &quot;\n&quot;));</span><br><span class="line">            connect(HttpSender.Method.POST, uri).withJsonContent(requestBody).send().onSuccess(response -&gt; &#123;</span><br><span class="line">                int numberOfSentItems = batch.size();</span><br><span class="line">                String responseBody = response.body();</span><br><span class="line">                if (responseBody.contains(ERROR_RESPONSE_BODY_SIGNATURE)) &#123;</span><br><span class="line">                    int numberOfCreatedItems = countCreatedItems(responseBody);</span><br><span class="line">                    logger.debug(&quot;failed metrics payload: &#123;&#125;&quot;, requestBody);</span><br><span class="line">                    logger.error(&quot;failed to send metrics to elastic (sent &#123;&#125; metrics but created &#123;&#125; metrics): &#123;&#125;&quot;,</span><br><span class="line">                            numberOfSentItems, numberOfCreatedItems, responseBody);</span><br><span class="line">                &#125;</span><br><span class="line">                else &#123;</span><br><span class="line">                    logger.debug(&quot;successfully sent &#123;&#125; metrics to elastic&quot;, numberOfSentItems);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;).onError(response -&gt; &#123;</span><br><span class="line">                logger.debug(&quot;failed metrics payload: &#123;&#125;&quot;, requestBody);</span><br><span class="line">                logger.error(&quot;failed to send metrics to elastic: &#123;&#125;&quot;, response.body());</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line">        catch (Throwable e) &#123;</span><br><span class="line">            logger.error(&quot;failed to send metrics to elastic&quot;, e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里就比较直观了，<code>publish()</code>方法中首先通过<code>createIndexTemplateIfNeeded()</code>方法创建了<code>elasticsearch</code>的<code>index</code>的<code>Template</code>。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">private void createIndexTemplateIfNeeded() &#123;</span><br><span class="line">    if (checkedForIndexTemplate || !config.autoCreateIndex()) &#123;</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    try &#123;</span><br><span class="line">        String uri = config.host() + ES_METRICS_TEMPLATE;</span><br><span class="line">        if (connect(HttpSender.Method.HEAD, uri).send().onError(response -&gt; &#123;</span><br><span class="line">            if (response.code() != 404) &#123;</span><br><span class="line">                logger.error(&quot;could not create index in elastic (HTTP &#123;&#125;): &#123;&#125;&quot;, response.code(), response.body());</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;).isSuccessful()) &#123;</span><br><span class="line">            checkedForIndexTemplate = true;</span><br><span class="line">            logger.debug(&quot;metrics template already exists&quot;);</span><br><span class="line">            return;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        connect(HttpSender.Method.PUT, uri).withJsonContent(getTemplateBody()).send().onError(</span><br><span class="line">                response -&gt; logger.error(&quot;failed to add metrics template to elastic: &#123;&#125;&quot;, response.body()));</span><br><span class="line">    &#125;</span><br><span class="line">    catch (Throwable e) &#123;</span><br><span class="line">        logger.error(&quot;could not create index in elastic&quot;, e);</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    checkedForIndexTemplate = true;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里创建的<code>uri</code>就是拼接的<code>config</code>里面的<code>host</code>和<code>ES_METRICS_TEMPLATE</code>,而<code>ES_METRICS_TEMPLATE</code>的值为</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">private static final String ES_METRICS_TEMPLATE = &quot;/_template/metrics_template&quot;;</span><br></pre></td></tr></table></figure>
-<p>所以可以看到，回到<code>publish()</code>方法，可以看到这里出现了uri</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">String uri = config.host() + &quot;/&quot; + indexName() + &quot;/_bulk&quot;;</span><br></pre></td></tr></table></figure>
-<p>这里出现了<code>indexName()</code>方法</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">protected String indexName() &#123;</span><br><span class="line">    ZonedDateTime dt = ZonedDateTime.ofInstant(new Date(config().clock().wallTime()).toInstant(), ZoneOffset.UTC);</span><br><span class="line">    return config.index() + config.indexDateSeparator() + indexDateFormatter.format(dt);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>从代码可以看出，<code>indexName</code>返回的是<code>index</code>+分隔符+格式化后时间的格式。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">default String index() &#123;</span><br><span class="line">    return getString(this, &quot;index&quot;).orElse(&quot;micrometer-metrics&quot;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>通过代码可以看出，默认的<code>index</code>就是<code>micrometer-metrics</code>。</p>
-<p>回到<code>createIndexTemplateIfNeeded()</code>方法</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">private void createIndexTemplateIfNeeded() &#123;</span><br><span class="line">    if (checkedForIndexTemplate || !config.autoCreateIndex()) &#123;</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    try &#123;</span><br><span class="line">        String uri = config.host() + ES_METRICS_TEMPLATE;</span><br><span class="line">        //如果请求出现了错误，将会报错，下面将会执行connect方法去创建template</span><br><span class="line">        if (connect(HttpSender.Method.HEAD, uri).send().onError(response -&gt; &#123;</span><br><span class="line">            if (response.code() != 404) &#123;</span><br><span class="line">                logger.error(&quot;could not create index in elastic (HTTP &#123;&#125;): &#123;&#125;&quot;, response.code(), response.body());</span><br><span class="line">            &#125;</span><br><span class="line">        //如果请求回复正常，将提示metrics已经存在，并直接返回</span><br><span class="line">        &#125;).isSuccessful()) &#123;</span><br><span class="line">            checkedForIndexTemplate = true;</span><br><span class="line">            logger.debug(&quot;metrics template already exists&quot;);</span><br><span class="line">            return;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        connect(HttpSender.Method.PUT, uri).withJsonContent(getTemplateBody()).send().onError(</span><br><span class="line">                response -&gt; logger.error(&quot;failed to add metrics template to elastic: &#123;&#125;&quot;, response.body()));</span><br><span class="line">    &#125;</span><br><span class="line">    catch (Throwable e) &#123;</span><br><span class="line">        logger.error(&quot;could not create index in elastic&quot;, e);</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    checkedForIndexTemplate = true;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>其中<code>ES_METRICS_TEMPLATE</code>的值如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">private static final String ES_METRICS_TEMPLATE = &quot;/_template/metrics_template&quot;;</span><br></pre></td></tr></table></figure>
-<p>表明<code>uri</code>由<code>host</code>和这个路径组成，然后通过代码逻辑可知，如果访问这个<code>uri</code>错误，可知<code>template</code>不存在，代码将会报错，然后进入下面的创建<code>template</code>方法</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">connect(HttpSender.Method.PUT, uri).withJsonContent(getTemplateBody()).send()</span><br></pre></td></tr></table></figure>
-<p>如果<code>uri</code>访问成功，说明<code>template</code>存在，将会直接<code>return</code>,也就不会创建<code>template</code>。<br>可以通过<code>getTemplateBody()</code>方法来知道创建的<code>template</code>是什么样的。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">private String getTemplateBody() &#123;</span><br><span class="line">    return TEMPLATE_BODY_AFTER_VERSION_7.apply(config.index() + config.indexDateSeparator());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">private static final Function&lt;String, String&gt; TEMPLATE_BODY_AFTER_VERSION_7 = (indexPrefix) -&gt; &quot;&#123;\n&quot;</span><br><span class="line">        + &quot;  \&quot;index_patterns\&quot;: [\&quot;&quot; + indexPrefix + &quot;*\&quot;],\n&quot; + &quot;  \&quot;mappings\&quot;: &#123;\n&quot; + &quot;    \&quot;_source\&quot;: &#123;\n&quot;</span><br><span class="line">        + &quot;      \&quot;enabled\&quot;: false\n&quot; + &quot;    &#125;,\n&quot; + TEMPLATE_PROPERTIES + &quot;  &#125;\n&quot; + &quot;&#125;&quot;;</span><br></pre></td></tr></table></figure>
-<p>可以看到创建出的<code>template</code>的<code>_source</code>字段的<code>enabled</code>设置为<code>false</code>，导致了<code>template</code>关联的<code>index</code>不会显示完整的数据信息。同时<code>indexPrefix</code>由传入的<code>config.index()+ config.indexDateSeparator()</code>组成</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">default String indexDateSeparator() &#123;</span><br><span class="line">    return getString(this, &quot;indexDateSeparator&quot;).orElse(&quot;-&quot;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>而<code>indexDateSeparator()</code>默认为<code>-</code>，所以<code>template</code>关联的<code>index</code>是<code>config.index()</code>获取到的<code>micrometer-metrics</code>加上<code>&quot;-&quot;</code>再加上<code>&quot;*&quot;</code>，即<code>micrometer-metrics-*</code></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">ElasticSearch</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">ElasticMeterRegistry</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">micronaut</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">micronaut-micrometer</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="/lintonwang/categories/ElasticSearch//" class="article-tag-list-link color4">ElasticSearch</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/lintonwang/2022/08/08/ElasticMeterRegistry%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-ElasticSearch _source字段" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/lintonwang/2022/08/08/ElasticSearch%20_source%E5%AD%97%E6%AE%B5/">ElasticSearch _source字段设置false导致的查询不出数据内容问题</a>
-    </h1>
-  
-
-        
-        <a href="/lintonwang/2022/08/08/ElasticSearch%20_source%E5%AD%97%E6%AE%B5/" class="archive-article-date">
-  	<time datetime="2022-08-08T09:09:34.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-08</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>在对<code>ElasticSearch</code>进行查询的时候，查询结果如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  &quot;took&quot; : 0,</span><br><span class="line">  &quot;timed_out&quot; : false,</span><br><span class="line">  &quot;_shards&quot; : &#123;</span><br><span class="line">    &quot;total&quot; : 1,</span><br><span class="line">    &quot;successful&quot; : 1,</span><br><span class="line">    &quot;skipped&quot; : 0,</span><br><span class="line">    &quot;failed&quot; : 0</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;hits&quot; : &#123;</span><br><span class="line">    &quot;total&quot; : &#123;</span><br><span class="line">      &quot;value&quot; : 1,</span><br><span class="line">      &quot;relation&quot; : &quot;eq&quot;</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;max_score&quot; : 0.7549127,</span><br><span class="line">    &quot;hits&quot; : [</span><br><span class="line">      &#123;</span><br><span class="line">        &quot;_index&quot; : &quot;student_new&quot;,</span><br><span class="line">        &quot;_type&quot; : &quot;_doc&quot;,</span><br><span class="line">        &quot;_id&quot; : &quot;1&quot;,</span><br><span class="line">        &quot;_score&quot; : 0.7549127</span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>可以看到查询结果中只有基本的三个字段和score评分，而查阅es的文档可以知道，</p>
-<blockquote>
-<p>The _source field contains the original JSON document body that was passed at index time. The _source field itself is not indexed (and thus is not searchable), but it is stored so that it can be returned when executing fetch requests, like get or search. </p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  &quot;mappings&quot;: &#123;</span><br><span class="line">    &quot;_source&quot;: &#123;</span><br><span class="line">      &quot;enabled&quot;: false</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>意思是_source字段包含了原始的JSON文档内容，当上面的_source的enable属性设置为false时，会导致不会存储原始的json文档内容。而es是使用的倒排索引。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">PUT student/_doc/1</span><br><span class="line">&#123;</span><br><span class="line">  &quot;name&quot;:&quot;Jack&quot;,</span><br><span class="line">  &quot;age&quot;: 15,</span><br><span class="line">  &quot;like&quot;: &quot;hiking,basketball&quot;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">PUT student/_doc/2</span><br><span class="line">&#123;</span><br><span class="line">  &quot;name&quot;:&quot;Tom&quot;,</span><br><span class="line">  &quot;age&quot;: 16,</span><br><span class="line">  &quot;like&quot;: &quot;football,swiming,basketball&quot;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>对于例子中两条数据，es存储如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Jack-&gt;1</span><br><span class="line">15-&gt;1</span><br><span class="line">hiking-&gt;1</span><br><span class="line">basketball-&gt;1,2</span><br><span class="line">Tom-&gt;2</span><br><span class="line">16-&gt;2</span><br><span class="line">football-&gt;2</span><br><span class="line">swiming-&gt;2</span><br></pre></td></tr></table></figure>
-<p>当_source的属性enabled为true的时候，会额外存储如下数据</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">1-&gt;Jack,15,[hiking,basketball]</span><br><span class="line">2-&gt;Tom,16,[football,swiming,basketball]</span><br></pre></td></tr></table></figure>
-<p>所以，当enable设置为false的时候，查询仍然可用，只是不会显示完整的数据信息。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">ElasticSearch</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">_source</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="/lintonwang/categories/ElasticSearch//" class="article-tag-list-link color4">ElasticSearch</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/lintonwang/2022/08/08/ElasticSearch%20_source%E5%AD%97%E6%AE%B5/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-  
 
 
           </div>
@@ -607,10 +241,10 @@
     <script>
 	var yiliaConfig = {
 		mathjax: false,
-		isHome: true,
+		isHome: false,
 		isPost: false,
 		isArchive: false,
-		isTag: false,
+		isTag: true,
 		isCategory: false,
 		open_in_new: false,
 		toc_hide_index: true,
