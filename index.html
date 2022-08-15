@@ -424,15 +424,15 @@
         		</li>
       		 
         		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">ElasticMeterRegistry</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
         			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">micronaut</a>
         		</li>
       		 
         		<li class="article-tag-list-item">
         			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">micronaut-micrometer</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">ElasticMeterRegistry</a>
         		</li>
       		
 		</ul>
@@ -513,10 +513,67 @@
 <p>意思是_source字段包含了原始的JSON文档内容，当上面的_source的enable属性设置为false时，会导致不会存储原始的json文档内容。而es是使用的倒排索引。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">PUT student/_doc/1</span><br><span class="line">&#123;</span><br><span class="line">  &quot;name&quot;:&quot;Jack&quot;,</span><br><span class="line">  &quot;age&quot;: 15,</span><br><span class="line">  &quot;like&quot;: &quot;hiking,basketball&quot;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">PUT student/_doc/2</span><br><span class="line">&#123;</span><br><span class="line">  &quot;name&quot;:&quot;Tom&quot;,</span><br><span class="line">  &quot;age&quot;: 16,</span><br><span class="line">  &quot;like&quot;: &quot;football,swiming,basketball&quot;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>对于例子中两条数据，es存储如下</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Jack-&gt;1</span><br><span class="line">15-&gt;1</span><br><span class="line">hiking-&gt;1</span><br><span class="line">basketball-&gt;1,2</span><br><span class="line">Tom-&gt;2</span><br><span class="line">16-&gt;2</span><br><span class="line">football-&gt;2</span><br><span class="line">swiming-&gt;2</span><br></pre></td></tr></table></figure>
+<table>
+<thead>
+<tr>
+<th>term</th>
+<th>docs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jack</td>
+<td>1</td>
+</tr>
+<tr>
+<td>15</td>
+<td>1</td>
+</tr>
+<tr>
+<td>hiking</td>
+<td>1</td>
+</tr>
+<tr>
+<td>basketball</td>
+<td>1,2</td>
+</tr>
+<tr>
+<td>Tom</td>
+<td>2</td>
+</tr>
+<tr>
+<td>16</td>
+<td>2</td>
+</tr>
+<tr>
+<td>football</td>
+<td>2</td>
+</tr>
+<tr>
+<td>swiming</td>
+<td>2</td>
+</tr>
+</tbody></table>
 <p>当_source的属性enabled为true的时候，会额外存储如下数据</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">1-&gt;Jack,15,[hiking,basketball]</span><br><span class="line">2-&gt;Tom,16,[football,swiming,basketball]</span><br></pre></td></tr></table></figure>
-<p>所以，当enable设置为false的时候，查询仍然可用，只是不会显示完整的数据信息。</p>
+<table>
+<thead>
+<tr>
+<th>doc</th>
+<th>term</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Jack,15,[hiking,basketball]</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Tom,16,[football,swiming,basketball]</td>
+</tr>
+<tr>
+<td>所以，当enable设置为false的时候，查询仍然可用，只是不会显示完整的数据信息。</td>
+<td></td>
+</tr>
+</tbody></table>
 
       
 
@@ -682,7 +739,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
              
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color3">_source</a>
+                <a href="javascript:void(0)" class="js-tag color1">ElasticMeterRegistry</a>
               </li>
              
               <li class="article-tag-list-item">
@@ -694,15 +751,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
              
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color1">ElasticMeterRegistry</a>
-              </li>
-             
-              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color4">git</a>
               </li>
              
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">git-svn</a>
+              </li>
+             
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color3">_source</a>
               </li>
             
             <div class="clearfix"></div>
